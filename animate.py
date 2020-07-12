@@ -41,7 +41,7 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
 
             utils.save_image(
                 sample,
-                f'sample/{str(i).zfill(6)}.png',
+                f'sample/frame{str(i).zfill(6)}.png',
                 nrow=1,
                 normalize=True,
                 range=(-1, 1),
