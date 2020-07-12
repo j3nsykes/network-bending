@@ -153,7 +153,7 @@ if __name__ == '__main__':
     ext_state_dict  = torch.load(args.ckpt)['g_ema']
     g_ema.load_state_dict(checkpoint['g_ema'], strict=False)
     new_state_dict.update(ext_state_dict)
-    g_ema.load_state_dict(new_state_dict)
+    g_ema.load_state_dict(new_state_dict, strict=False)
     g_ema.eval()
     g_ema.to(device)
 
