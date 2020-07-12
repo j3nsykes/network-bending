@@ -337,7 +337,8 @@ class StyledConv(nn.Module):
 
     def forward(self, input, style, noise=None, transform_dict_list=[]):
         out = self.conv(input, style)
-        out = self.noise(out, noise=noise)
+        #out = self.noise(out, noise=noise)
+        out = self.noise(out, noise=self.manipulation(noise, transform_dict_list))
         # out = out + self.bias
         out = self.activate(out)
         out = self.manipulation(out, transform_dict_list)
