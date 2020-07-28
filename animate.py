@@ -38,8 +38,9 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
             
             #pass in audio count
             if(args.audio_affects == "truncation"):
-                trnc = mapped(audio[os.path.basename(args.audio_file)[:-4]][i],0.0,1.0,0.4,1.0)
+                # trnc = mapped(audio[os.path.basename(args.audio_file)[:-4]][i],0.0,1.0,0.1,1.0)
                 # trnc = audio[os.path.basename(args.audio_file)[:-4]][i]
+                trnc = 1-audio[os.path.basename(args.audio_file)[:-4]][i]
             else:
                 trnc = args.truncation
                 # trnc = i/args.num_frames
@@ -49,7 +50,7 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
                 start_z = int(i/interp_frames)
                 fraction = (i % interp_frames) / interp_frames
                 counter = str(start_z)+'/'+str(len(latents))
-                # print(interp_frames, counter, fraction)
+                print(interp_frames, counter, fraction)
 
                 # capture frame count overflow
                 if(start_z >= (len(latents)-1)):
