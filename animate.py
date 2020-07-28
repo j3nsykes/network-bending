@@ -36,22 +36,27 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
             else:
                 t_dict_list = [create_cluster_transform_dict(args.layer_id, layer_channel_dims, cluster_config, transform, params, args.cluster_id)]
             
+            #pass in audio count
             if(args.audio_affects == "truncation"):
-              trnc = audio[os.path.basename(args.audio_file)[:-4]][i]
+                trnc = audio[os.path.basename(args.audio_file)[:-4]][i]
             else:
-              trnc = args.truncation
-              # trnc = i/args.num_frames
+                trnc = args.truncation
+                # trnc = i/args.num_frames
 
             if args.interpolate_ids != "":
-              interp_frames = int(args.num_frames/(len(latents)-1))
-              start_z = int(i/interp_frames)
-              fraction = (i % interp_frames) / interp_frames
-              # print(interp_frames, start_z, fraction)
+                interp_frames = int(args.num_frames/(len(latents)-1))
+                start_z = int(i/interp_frames)
+                fraction = (i % interp_frames) / interp_frames
+                # print(interp_frames, start_z, fraction)
 
-              latent = (latents[start_z+1]*fraction) + (latents[start_z]*(1-fraction))
-              sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+                # capture frame count overflow
+                if((start_z+1) > len(latents)):
+                    latent = latents[start_z]
+                else :
+                    latent = (latents[start_z+1]*fraction) + (latents[start_z]*(1-fraction))
+                sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
             else:
-              sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+                sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
 
             if not os.path.exists(args.dir):
                 os.makedirs(args.dir)
