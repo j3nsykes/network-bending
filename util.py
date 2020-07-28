@@ -1,4 +1,8 @@
+import os
 import random
+import numpy as np
+from scipy.io import wavfile
+import moviepy.editor
 
 def create_layer_channel_dim_dict(channel_multiplier):
     layer_channel_dict = {
@@ -125,3 +129,26 @@ def create_transforms_dict_list_list(yaml_config, cluster_config, layer_channel_
     
     return transform_dict_list_list
         
+def get_waveform(wav_filename,fps):
+    from scipy.interpolate import interp1d
+    audio = {}
+    if not os.path.exists(wav_filename):
+        audio_clip = moviepy.editor.AudioFileClip(wav_filename)
+        audio_clip.write_audiofile(wav_filename, fps=44100, nbytes=2, codec='pcm_s16le')
+    
+    track_name = os.path.basename(wav_filename)[:-4]
+    rate, signal = wavfile.read(wav_filename)
+    signal = np.mean(signal, axis=1) # to mono
+    signal = np.abs(signal)
+    duration = signal.shape[0] / rate
+    frames = int(np.ceil(duration * fps))
+    samples_per_frame = signal.shape[0] / frames
+    audio[track_name] = np.zeros(frames, dtype=signal.dtype)
+
+    for frame in range(frames):
+        start = int(round(frame * samples_per_frame))
+        stop = int(round((frame + 1) * samples_per_frame))
+        audio[track_name][frame] = np.mean(signal[start:stop], axis=0)
+    audio[track_name] /= max(audio[track_name])
+
+    return audio

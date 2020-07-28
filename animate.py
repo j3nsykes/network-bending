@@ -4,6 +4,7 @@ import yaml
 import os
 import faulthandler
 import numpy as np
+import matplotlib.pyplot as plt
 
 from torchvision import utils
 from model import Generator
@@ -14,11 +15,11 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
     with torch.no_grad():
         g_ema.eval()
         increment = ( args.end_val - args.init_val ) / float(args.num_frames)
-        print(args.init_val)
-        print(args.end_val)
-        print(args.num_frames)
+        
         for i in tqdm(range(args.num_frames)):
             param = args.init_val + (increment * (i+1))
+            if args.transform == "rotate":
+              param = (param % 360.0)
             print("animating frame: " +str(i) + " , param: " +str(param))
             if args.transform == "translate_x":
                 transform = "translate"
@@ -34,14 +35,30 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
                 t_dict_list = [create_layer_wide_transform_dict(args.layer_id, layer_channel_dims, transform, params)]
             else:
                 t_dict_list = [create_cluster_transform_dict(args.layer_id, layer_channel_dims, cluster_config, transform, params, args.cluster_id)]
-            sample, _ = g_ema([latent],truncation=args.truncation, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+            
+            if(args.audio_affects == "truncation"):
+              trnc = audio[os.path.basename(args.audio_file)[:-4]][i]
+            else:
+              trnc = args.truncation
+              # trnc = i/args.num_frames
 
-            if not os.path.exists('sample'):
-                os.makedirs('sample')
+            if args.interpolate_ids != "":
+              interp_frames = int(args.num_frames/(len(latents)-1))
+              start_z = int(i/interp_frames)
+              fraction = (i % interp_frames) / interp_frames
+              # print(interp_frames, start_z, fraction)
+
+              latent = (latents[start_z+1]*fraction) + (latents[start_z]*(1-fraction))
+              sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+            else:
+              sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+
+            if not os.path.exists(args.dir):
+                os.makedirs(args.dir)
 
             utils.save_image(
                 sample,
-                f'sample/frame{str(i).zfill(6)}.png',
+                f'{str(args.dir)}/frame{str(i).zfill(6)}.png',
                 nrow=1,
                 normalize=True,
                 range=(-1, 1),
@@ -63,7 +80,8 @@ if __name__ == '__main__':
     parser.add_argument('--clusters', type=str, default="configs/example_cluster_dict.yaml")
     parser.add_argument('--load_latent', type=str, default="")
     parser.add_argument('--audio_file', type=str, default="")
-    parser.add_argument('--audio_affects', type=str, default="") 
+    parser.add_argument('--audio_affects', type=str, default="")
+    parser.add_argument('--fps', type=int, default=24)
     parser.add_argument('--interpolate', type=int, default = 0)
     parser.add_argument('--interpolate_ids', type=str, default = "0,1")
     parser.add_argument('--latent_id', type=int, default= 0)
@@ -73,6 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_frames', type=int, default = 100)
     parser.add_argument('--cluster_id', type=int, default = -1)
     parser.add_argument('--layer_id', type=int, default = 1)
+    parser.add_argument('--dir', type=str, default="sample-animation")
 
 
     args = parser.parse_args()
@@ -80,13 +99,17 @@ if __name__ == '__main__':
     args.latent = 512
     args.n_mlp = 8
 
-    # yaml_config = {}
-    
-    # with open(args.config, 'r') as stream:
-    #     try:
-    #         yaml_config = yaml.load(stream)
-    #     except yaml.YAMLError as exc:
-    #         print(exc)
+    if(args.audio_file != ""):
+        audio = get_waveform(args.audio_file, args.fps)
+        print(audio)
+        args.num_frames = len(audio[os.path.basename(args.audio_file)[:-4]])
+        print('overriding num_frames, now: ', args.num_frames)
+
+        for track in sorted(audio.keys()):
+            plt.figure(figsize=(8, 3))
+            plt.title(track)
+            plt.plot(audio[track])
+            plt.savefig(f'../{track}.png')
     
     cluster_config = {}
     if args.clusters != "":
@@ -131,6 +154,14 @@ if __name__ == '__main__':
     if args.load_latent == "":
         # generate(args, g_ema, device, mean_latent, yaml_config, cluster_config, layer_channel_dims)
         print("do nothing")
+    elif args.interpolate_ids != "":
+        # print(args.interpolate_ids)
+        ls = args.interpolate_ids.split(',')
+        latents=[]
+        for l in np.arange(len(ls)):
+          latents.append(torch.from_numpy(np.asarray(latent_config[int(ls[l])])).float().to(device))
+
+        animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_channel_dims, latents)
     else:
         latent = torch.from_numpy(np.asarray(latent_config[args.latent_id])).float().to(device)
         animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_channel_dims, latent)
