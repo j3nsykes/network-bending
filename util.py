@@ -128,7 +128,11 @@ def create_transforms_dict_list_list(yaml_config, cluster_config, layer_channel_
         transform_dict_list_list.append(transform_dict_list)
     
     return transform_dict_list_list
-        
+
+def mapped(x,minf,maxf,mapmax,mapmin):
+    val = (x-minf)/(maxf-minf)
+    return (val*(mapmax-mapmin))+mapmin
+ 
 def get_waveform(wav_filename,fps):
     from scipy.interpolate import interp1d
     audio = {}

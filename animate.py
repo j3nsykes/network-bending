@@ -38,7 +38,8 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
             
             #pass in audio count
             if(args.audio_affects == "truncation"):
-                trnc = audio[os.path.basename(args.audio_file)[:-4]][i]
+                trnc = mapped(audio[os.path.basename(args.audio_file)[:-4]][i],0.0,1.0,0.4,1.0)
+                # trnc = audio[os.path.basename(args.audio_file)[:-4]][i]
             else:
                 trnc = args.truncation
                 # trnc = i/args.num_frames
@@ -47,10 +48,11 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
                 interp_frames = int(args.num_frames/(len(latents)-1))
                 start_z = int(i/interp_frames)
                 fraction = (i % interp_frames) / interp_frames
-                # print(interp_frames, start_z, fraction)
+                counter = str(start_z)+'/'+str(len(latents))
+                # print(interp_frames, counter, fraction)
 
                 # capture frame count overflow
-                if((start_z+1) > len(latents)):
+                if(start_z >= (len(latents)-1)):
                     latent = latents[start_z]
                 else :
                     latent = (latents[start_z+1]*fraction) + (latents[start_z]*(1-fraction))
@@ -106,15 +108,15 @@ if __name__ == '__main__':
 
     if(args.audio_file != ""):
         audio = get_waveform(args.audio_file, args.fps)
-        print(audio)
+        # print(audio)
         args.num_frames = len(audio[os.path.basename(args.audio_file)[:-4]])
         print('overriding num_frames, now: ', args.num_frames)
 
-        for track in sorted(audio.keys()):
-            plt.figure(figsize=(8, 3))
-            plt.title(track)
-            plt.plot(audio[track])
-            plt.savefig(f'../{track}.png')
+        # for track in sorted(audio.keys()):
+        #     plt.figure(figsize=(8, 3))
+        #     plt.title(track)
+        #     plt.plot(audio[track])
+        #     plt.savefig(f'../{track}.png')
     
     cluster_config = {}
     if args.clusters != "":
