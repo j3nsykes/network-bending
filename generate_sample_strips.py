@@ -33,8 +33,8 @@ def generate_strips(args, g_ema, device, mean_latent, layer_channel_dims, config
         for i in tqdm(range(args.pics)):
             sample_z = torch.randn(args.sample, args.latent, device=device)
 
-            if not os.path.exists('sample'):
-                os.makedirs('sample')
+            if not os.path.exists(args.dir):
+                os.makedirs(args.dir)
             
             images = []
             for key in layer_channel_dims:
@@ -45,7 +45,7 @@ def generate_strips(args, g_ema, device, mean_latent, layer_channel_dims, config
             image = torch.cat(images)
             utils.save_image(
                 image,
-                f'sample/{str(i).zfill(6)}.png',
+                f'{args.dir}/{str(i).zfill(6)}.jpg',
                 nrow=1,
                 normalize=True,
                 range=(-1, 1),
@@ -64,6 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt', type=str, default="stylegan2-ffhq-config-f.pt")
     parser.add_argument('--channel_multiplier', type=int, default=2)
     parser.add_argument('--config', type=str, default="sample_strip_config.yaml")
+    parser.add_argument('--dir', type=str, default="./sample-strips/")
 
     args = parser.parse_args()
 
@@ -99,6 +100,7 @@ if __name__ == '__main__':
     layer_channel_dims = create_layer_channel_dim_dict(args.channel_multiplier)
     generate_strips(args, g_ema, device, mean_latent, layer_channel_dims, yaml_config)
     
-    with open(r'sample/config.yaml', 'w') as file:
+    y_path = os.path.join(args.dir, 'config.yaml')
+    with open(y_path, 'w') as file:
         documents = yaml.dump(yaml_config, file)
 
