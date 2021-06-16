@@ -1,7 +1,8 @@
 import argparse
+import os
+import subprocess
 import torch
 import yaml
-import os
 import faulthandler
 import numpy as np
 import matplotlib.pyplot as plt
@@ -173,6 +174,11 @@ if __name__ == '__main__':
     else:
         latent = torch.from_numpy(np.asarray(latent_config[args.latent_id])).float().to(device)
         animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_channel_dims, latent)
+
+    cmd=f'ffmpeg  -r 24 -i {args.dir}/frame%06d.png -vcodec libx264 -pix_fmt yuv420p {args.dir}/bend.mp4 -y'
+
+    #call ffmpeg command from python
+    subprocess.call(cmd, shell=True)
     
     # config_out = {}
     # config_out['transforms'] = yaml_config['transforms']
