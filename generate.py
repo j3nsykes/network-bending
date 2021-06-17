@@ -9,6 +9,7 @@ from tqdm import tqdm
 from util import *
 
 def generate(args, g_ema, device, mean_latent, yaml_config, cluster_config, layer_channel_dims):
+    latent_dict = {}
     with torch.no_grad():
         g_ema.eval()
         t_dict_list = create_transforms_dict_list(yaml_config, cluster_config, layer_channel_dims)
@@ -26,6 +27,13 @@ def generate(args, g_ema, device, mean_latent, yaml_config, cluster_config, laye
                 nrow=1,
                 normalize=True,
                 range=(-1, 1))
+
+            if args.save_latent == 1:
+                latent_dict[i] = sample_z.to('cpu').numpy().tolist()
+
+        if args.save_latent == 1:
+            with open(r'sample/latents.yaml', 'w') as file:
+                documents = yaml.dump(latent_dict, file)
 
 def generate_from_latent(args, g_ema, device, mean_latent, yaml_config, cluster_config, layer_channel_dims, latent, noise):
     with torch.no_grad():
@@ -64,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--load_latent', type=str, default="") 
     parser.add_argument('--clusters', type=str, default="configs/example_cluster_dict.yaml")
     parser.add_argument('--dir', type=str, default="./sample/", help="path to output samples")
+    parser.add_argument('--save_latent', type=int, default=0)
 
     args = parser.parse_args()
 

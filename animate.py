@@ -1,6 +1,7 @@
 import argparse
 import os
 import subprocess
+import copy
 import torch
 import yaml
 import faulthandler
@@ -12,28 +13,67 @@ from model import Generator
 from tqdm import tqdm
 from util import *
 
+def generate_noise_lerp(g_ema, frames):
+    #generate noise
+    noise = [getattr(g_ema.noises, f"noise_{i}") for i in range(g_ema.num_layers)]
+    noise2 = copy.deepcopy(noise)
+    for i,n in enumerate(noise2):
+        # if len(n[0][0]) < 256:
+        noise2[i] = (0.1**0.5)*torch.randn_like(n)
+        # noise2[i] = torch.randn_like(n)
+    
+    noise_slerps = []
+    for f in range(int(frames)):
+        ns = []
+        for i in range(len(noise)):
+            ns.append( torch.lerp(  noise[i], noise2[i], (f/(frames/2)) ) )
+        noise_slerps.append(ns)
+    
+    return noise_slerps
+
 def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_channel_dims, latent):
     with torch.no_grad():
         g_ema.eval()
-        increment = ( args.end_val - args.init_val ) / float(args.num_frames)
+        #increment = ( args.end_val - args.init_val ) / float(args.num_frames)
+
+        if(args.noise_interpolation):
+            noise_lerps = generate_noise_lerp(g_ema, args.num_frames)
+
+        args.transform = args.transform.split(',')
+        args.layer_id = args.layer_id.split(',')
+        args.init_val = args.init_val.split(',')
+        args.end_val = args.end_val.split(',')
+        params = []
+        increments = []
+
+        # convert to floats 
+        args.init_val = [float(v) for v in args.init_val]
+        args.end_val = [float(v) for v in args.end_val]
+        print(args.init_val)
+
+        for t in range(len(args.transform)):
+            params.append(0.0)
+            increments.append( (args.end_val[t] - args.init_val[t] ) / float(args.num_frames) )
+
+        print( len(args.transform) )
         
         for i in tqdm(range(args.num_frames)):
-            param = args.init_val + (increment * (i+1))
-            if args.transform == "rotate":
-              param = (param % 360.0)
-            print("animating frame: " +str(i) + " , param: " +str(param))
-            if args.transform == "translate_x":
-                transform = "translate"
-                params = [param,0]
-            elif args.transform == "translate_y":
-                transform = "translate"
-                params = [0,param]
-            else:
-                transform = args.transform
-                params = [param]
+            for t in range(len(args.transform)):
+                param = float(args.init_val[t]) + (increments[t] * (i+1))
+                if args.transform[t] == "rotate":
+                    params[t] = (param % 360.0)
+                print("animating frame: " +str(i) + " , param: " +str(param))
+                if args.transform[t] == "translate_x":
+                    transform = "translate"
+                elif args.transform[t] == "translate_y":
+                    transform = "translate"
+                else:
+                    params[t] = [param]
+
+                args.layer_id[t] = int(args.layer_id[t])
             
             if args.cluster_id == -1:
-                t_dict_list = [create_layer_wide_transform_dict(args.layer_id, layer_channel_dims, transform, params)]
+                t_dict_list = create_multiple_transforms_dict(args.layer_id, layer_channel_dims, args.transform, params)
             else:
                 t_dict_list = [create_cluster_transform_dict(args.layer_id, layer_channel_dims, cluster_config, transform, params, args.cluster_id)]
             
@@ -58,9 +98,16 @@ def animate_from_latent(args, g_ema, device, mean_latent, cluster_config, layer_
                     latent = latents[start_z]
                 else :
                     latent = (latents[start_z+1]*fraction) + (latents[start_z]*(1-fraction))
-                sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+
+                if(args.noise_interpolation):
+                    sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, noise=noise_lerps[i], truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+                else:
+                    sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
             else:
-                sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+                if(args.noise_interpolation):
+                    sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, noise=noise_lerps[i], truncation_latent=mean_latent, transform_dict_list=t_dict_list)
+                else:
+                    sample, _ = g_ema([latent],truncation=trnc, randomize_noise=False, truncation_latent=mean_latent, transform_dict_list=t_dict_list)
 
             if not os.path.exists(args.dir):
                 os.makedirs(args.dir)
@@ -95,12 +142,13 @@ if __name__ == '__main__':
     parser.add_argument('--interpolate_ids', type=str, default = "0,1")
     parser.add_argument('--latent_id', type=int, default= 0)
     parser.add_argument('--transform', type=str, default="")
-    parser.add_argument('--init_val',type=float, default = 0)
-    parser.add_argument('--end_val', type=float, default = 1)
+    parser.add_argument('--init_val',type=str, default = "0.0")
+    parser.add_argument('--end_val', type=str, default = "1.0")
     parser.add_argument('--num_frames', type=int, default = 100)
     parser.add_argument('--cluster_id', type=int, default = -1)
-    parser.add_argument('--layer_id', type=int, default = 1)
+    parser.add_argument('--layer_id', type=str, default = "1")
     parser.add_argument('--dir', type=str, default="sample-animation")
+    parser.add_argument('--noise_interpolation', dest='noise_interpolation', action='store_true')
 
 
     args = parser.parse_args()

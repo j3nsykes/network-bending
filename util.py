@@ -44,6 +44,20 @@ def create_layer_wide_transform_dict(layer, layer_channel_dict, transform, param
     }
     return transform_dict
 
+def create_multiple_transforms_dict(layer, layer_channel_dict, transform, params):
+    
+    transform_dict_list = []
+    for t in range(len(transform)):
+        layer_dim = layer_channel_dict[layer[t]]
+
+        transform_dict_list.append({
+            "layerID": layer[t],
+            "transformID": transform[t],
+            "indicies": range(0, layer_dim),
+            "params": params[t]
+        })
+    return transform_dict_list
+
 def create_cluster_transform_dict(layer, layer_channel_dict, cluster_config, transform, params, cluster_ID):
     layer_dim = layer_channel_dict[layer]
     indicies = []
